@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:land_map_test/pages/map_measure_screen.dart';
+import 'package:land_map_test/pages/measure_using_google_map.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,7 +20,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: false,
-      home: MapMeasureApp(),
+      home: MapAreaCalculator(),
     );
   }
 }
