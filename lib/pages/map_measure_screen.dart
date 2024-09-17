@@ -8,6 +8,8 @@ class MapMeasureScreen extends StatefulWidget {
   _MapMeasureScreenState createState() => _MapMeasureScreenState();
 }
 
+// Shoelace Formula
+
 class _MapMeasureScreenState extends State<MapMeasureScreen> {
   List<Offset> points = []; // Store points marked by the user
   List<Offset?> controlPoints = []; // Store control points for curves
@@ -15,6 +17,7 @@ class _MapMeasureScreenState extends State<MapMeasureScreen> {
   double scale = 1.0; // Scale factor between map and real-world (e.g., pixels per foot)
   File? _selectedImage; // For the uploaded image
   final ImagePicker _picker = ImagePicker(); // Image picker instance
+  double pixelDistance = 0.0; // State variable for pixel distance
 
   // Function to calculate the area using the Shoelace formula
   double calculatePolygonArea(List<Offset> points) {
@@ -40,6 +43,11 @@ class _MapMeasureScreenState extends State<MapMeasureScreen> {
     return sqrt(pow(p2.dx - p1.dx, 2) + pow(p2.dy - p1.dy, 2)) / scale; // Convert pixel distance to feet
   }
 
+  // Function to calculate the pixel distance between two points
+  double calculatePixelDistance(Offset p1, Offset p2) {
+    return sqrt(pow(p2.dx - p1.dx, 2) + pow(p2.dy - p1.dy, 2)); // Pixel distance
+  }
+
   // Function to allow user to pick an image from the gallery
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -48,6 +56,7 @@ class _MapMeasureScreenState extends State<MapMeasureScreen> {
         _selectedImage = File(pickedFile.path);
         points.clear(); // Reset points when a new image is picked
         controlPoints.clear(); // Reset control points as well
+        pixelDistance = 0.0; // Reset distance when a new map is picked
       });
     }
   }
@@ -94,8 +103,16 @@ class _MapMeasureScreenState extends State<MapMeasureScreen> {
       points.add(point);
       controlPoints.add(null); // Add a corresponding control point placeholder
 
-      if (points.length >= 2 && isCurveMode) {
-        _measureCurve();
+      // Calculate distance if we have at least two points
+      if (points.length >= 2) {
+        pixelDistance = calculatePixelDistance(
+          points[points.length - 2],
+          points[points.length - 1],
+        );
+
+        if (isCurveMode) {
+          _measureCurve();
+        }
       }
     });
   }
@@ -107,9 +124,14 @@ class _MapMeasureScreenState extends State<MapMeasureScreen> {
         points.removeLast(); // Remove the last point
         controlPoints.removeLast(); // Remove the last control point placeholder
 
-        // Clear control points if there are no more points
-        if (points.isEmpty) {
-          controlPoints.clear();
+        // Update pixel distance after removing a point
+        if (points.length >= 2) {
+          pixelDistance = calculatePixelDistance(
+            points[points.length - 2],
+            points[points.length - 1],
+          );
+        } else {
+          pixelDistance = 0.0; // Reset the distance if less than 2 points remain
         }
       });
     }
@@ -119,7 +141,9 @@ class _MapMeasureScreenState extends State<MapMeasureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Land Map Measure"),
+        title: points.length >= 2
+            ? Text("Distance: ${pixelDistance.toStringAsFixed(1)} pixels")
+            : Text("Land Map Measure"),
         actions: [
           Switch(
             value: isCurveMode,
@@ -256,35 +280,33 @@ class MapPainter extends CustomPainter {
           (points[i].dx + points[i + 1].dx) / 2,
           (points[i].dy + points[i + 1].dy) / 2,
         );
-        TextSpan span = TextSpan(text: '${distance.toStringAsFixed(1)} feet', style: textStyle);
-        TextPainter tp = TextPainter(text: span, textAlign: TextAlign.left, textDirection: TextDirection.ltr);
+        TextSpan span = TextSpan(text: '${distance.toStringAsFixed(2)} ft', style: textStyle);
+        TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
         tp.layout();
         tp.paint(canvas, midpoint);
       }
     }
 
-    // Draw circles on each point where the user clicked
-    for (var point in points) {
-      canvas.drawCircle(point, 6.0, pointPaint);
+    // Draw the points as small blue circles
+    for (Offset point in points) {
+      canvas.drawCircle(point, 3.0, pointPaint);
     }
 
-    // Draw control points for curves
-    if (isCurveMode) {
-      for (var controlPoint in controlPoints) {
-        if (controlPoint != null) {
-          canvas.drawCircle(controlPoint, 6.0, controlPaint);
-        }
+    // Draw the control points as small green circles (for curve mode)
+    for (Offset? controlPoint in controlPoints) {
+      if (controlPoint != null) {
+        canvas.drawCircle(controlPoint, 5.0, controlPaint);
       }
     }
   }
 
-  // Function to calculate the distance between two points
-  double calculateDistance(Offset p1, Offset p2) {
-    return sqrt(pow(p2.dx - p1.dx, 2) + pow(p2.dy - p1.dy, 2)); // Pixel distance
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) {
-    return true;
+  // Utility function to calculate distance between two points
+  double calculateDistance(Offset p1, Offset p2) {
+    return sqrt(pow(p2.dx - p1.dx, 2) + pow(p2.dy - p1.dy, 2));
   }
 }
